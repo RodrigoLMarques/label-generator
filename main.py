@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Impressor de Etiquetas de Preço - Pimaco A5Q-813
-Folha A5 landscape | 13 colunas x 14 linhas = 182 etiquetas por folha
-Formato de entrada: uma etiqueta por linha (ex: R$25, R$100)
+Price Label Printer - Pimaco A5Q-813
+A5 landscape sheet | 13 columns x 14 rows = 182 labels per sheet
+Input format: one label per line (e.g. R$25, R$100)
 
-Uso:
-    python imprimir_etiquetas.py etiquetas.txt
-    python imprimir_etiquetas.py etiquetas.txt saida.pdf
+Usage:
+    python main.py labels.txt
+    python main.py labels.txt output.pdf
 """
 
 import sys
@@ -15,90 +15,89 @@ from reportlab.lib.pagesizes import landscape, A5
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
-# ─── Layout da folha A5Q-813 em paisagem ──────────────────────────────────────
+# ─── A5Q-813 landscape sheet layout ──────────────────────────────────────────
 PAGE_W, PAGE_H = landscape(A5)   # 595.28 x 419.53 pts  (210 x 148.5 mm)
 
-COLUNAS        = 13
-LINHAS         = 14
-ETIQ_POR_FOLHA = COLUNAS * LINHAS   # 182
+COLUMNS        = 13
+ROWS           = 14
+LABELS_PER_SHEET = COLUMNS * ROWS   # 182
 
-ETIQUETA_W     = 13.0 * mm
-ETIQUETA_H     =  8.0 * mm
+LABEL_W        = 13.0 * mm
+LABEL_H        =  8.0 * mm
 
-# Margens calibradas a partir do PDF de referência (medição real)
-MARGEM_ESQ     = 8.5 * mm
-MARGEM_SUP     =  5.0 * mm
+# Margins calibrated from reference PDF (real measurement)
+MARGIN_LEFT    = 8.5 * mm
+MARGIN_TOP     = 5.0 * mm
 
-# Gap entre etiquetas calculado para preencher a área útil
-GAP_H = (PAGE_W - MARGEM_ESQ * 2 - COLUNAS * ETIQUETA_W) / (COLUNAS - 1)
-GAP_V = (PAGE_H - MARGEM_SUP * 2 - LINHAS  * ETIQUETA_H) / (LINHAS  - 1)
+# Gap between labels calculated to fill the usable area
+GAP_H = (PAGE_W - MARGIN_LEFT * 2 - COLUMNS * LABEL_W) / (COLUMNS - 1)
+GAP_V = (PAGE_H - MARGIN_TOP  * 2 - ROWS    * LABEL_H) / (ROWS    - 1)
 
-PASSO_H = ETIQUETA_W + GAP_H
-PASSO_V = ETIQUETA_H + GAP_V
+STEP_H = LABEL_W + GAP_H
+STEP_V = LABEL_H + GAP_V
 
-# ─── Fonte e tamanho automático por comprimento do texto ──────────────────────
-FONTE = "Times-Roman"
+# ─── Font and automatic size by text length ───────────────────────────────────
+FONT = "Times-Roman"
 
-def tamanho_fonte(texto: str) -> float:
-    """Ajusta o tamanho da fonte conforme o comprimento do valor."""
-    n = len(texto)
+def font_size(text: str) -> float:
+    n = len(text)
     if n <= 3:  return 14.5   # R$5
     if n == 4:  return 14.5   # R$25
     if n == 5:  return 11.5   # R$100
     return 5.5
 
 
-def parsear_linhas(linhas) -> list[str]:
-    etiquetas = []
-    for linha in linhas:
-        linha = linha.strip()
-        if not linha:
+def parse_lines(lines) -> list[str]:
+    labels = []
+    for line in lines:
+        line = line.strip()
+        if not line:
             continue
-        if "x" in linha:
-            multiplo, _, texto = linha.partition("x")
-            if multiplo.isdigit() and texto:
-                etiquetas.extend([texto] * int(multiplo))
+        if "x" in line:
+            multiplier, _, text = line.partition("x")
+            if multiplier.isdigit() and text:
+                labels.extend([text] * int(multiplier))
                 continue
-        etiquetas.append(linha)
-    return etiquetas
+        labels.append(line)
+    return labels
 
 
-def carregar_etiquetas(caminho_txt: str) -> list[str]:
-    if not os.path.exists(caminho_txt):
-        print(f"[ERRO] Arquivo não encontrado: {caminho_txt}")
+def load_labels(txt_path: str) -> list[str]:
+    if not os.path.exists(txt_path):
+        print(f"[ERROR] File not found: {txt_path}")
         sys.exit(1)
-    with open(caminho_txt, encoding="utf-8") as f:
-        etiquetas = parsear_linhas(f)
-    print(f"[INFO] {len(etiquetas)} etiqueta(s) lida(s) de '{caminho_txt}'")
-    return etiquetas
+    with open(txt_path, encoding="utf-8") as f:
+        labels = parse_lines(f)
+    print(f"[INFO] {len(labels)} label(s) loaded from '{txt_path}'")
+    return labels
 
 
-def gerar_pdf(etiquetas: list[str], destino) -> None:
-    total_paginas = max(1, -(-len(etiquetas) // ETIQ_POR_FOLHA))
+def generate_pdf(labels: list[str], dest) -> None:
+    total_pages = max(1, -(-len(labels) // LABELS_PER_SHEET))
 
-    c = canvas.Canvas(destino, pagesize=landscape(A5))
+    c = canvas.Canvas(dest, pagesize=landscape(A5))
 
     idx = 0
-    for _ in range(total_paginas):
-        for linha in range(LINHAS):
-            for col in range(COLUNAS):
-                if idx >= len(etiquetas):
+    for _ in range(total_pages):
+        for row in range(ROWS):
+            for col in range(COLUMNS):
+                if idx >= len(labels):
                     break
 
-                texto = etiquetas[idx]
+                text = labels[idx]
                 idx += 1
 
-                x = MARGEM_ESQ + col * PASSO_H
-                y = PAGE_H - MARGEM_SUP - (linha + 1) * ETIQUETA_H - linha * GAP_V
+                x = MARGIN_LEFT + col * STEP_H
+                y = PAGE_H - MARGIN_TOP - (row + 1) * LABEL_H - row * GAP_V
 
-                fs = tamanho_fonte(texto)
-                c.setFont(FONTE, fs)
+                fs = font_size(text)
+                c.setFont(FONT, fs)
 
-                tw = c.stringWidth(texto, FONTE, fs)
-                tx = x + (ETIQUETA_W - tw) / 2
-                ty = y + (ETIQUETA_H - fs) / 2 + 0.5
+                tw = c.stringWidth(text, FONT, fs)
+                tx = x + (LABEL_W - tw) / 2
+                ty = y + (LABEL_H - fs) / 2 + 0.5
 
-                c.drawString(tx, ty, texto)
+                c.drawString(tx, ty, text)
 
             else:
                 continue
@@ -114,14 +113,14 @@ def main():
         print(__doc__)
         sys.exit(0)
 
-    caminho_txt = sys.argv[1]
-    caminho_pdf = (
+    txt_path = sys.argv[1]
+    pdf_path = (
         sys.argv[2] if len(sys.argv) >= 3
-        else caminho_txt.rsplit(".", 1)[0] + "_etiquetas.pdf"
+        else txt_path.rsplit(".", 1)[0] + "_labels.pdf"
     )
 
-    etiquetas = carregar_etiquetas(caminho_txt)
-    gerar_pdf(etiquetas, caminho_pdf)
+    labels = load_labels(txt_path)
+    generate_pdf(labels, pdf_path)
 
 
 if __name__ == "__main__":

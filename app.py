@@ -1,6 +1,6 @@
 from io import BytesIO
 from flask import Flask, request, send_file, render_template
-from main import parsear_linhas, gerar_pdf
+from main import parse_lines, generate_pdf
 
 app = Flask(__name__)
 
@@ -11,22 +11,22 @@ def index():
 
 
 @app.route("/gerar", methods=["POST"])
-def gerar():
-    quantidades = request.form.getlist("qty")
-    valores = request.form.getlist("val")
-    linhas = [f"{q}xR${v}" for q, v in zip(quantidades, valores)
-              if q and v and q.isdigit() and 0 < int(q) < 1000]
-    etiquetas = parsear_linhas(linhas)
+def generate():
+    quantities = request.form.getlist("qty")
+    values = request.form.getlist("val")
+    lines = [f"{q}xR${v}" for q, v in zip(quantities, values)
+             if q and v and q.isdigit() and 0 < int(q) < 1000]
+    labels = parse_lines(lines)
 
-    if not etiquetas:
-        return "Nenhuma etiqueta informada.", 400
+    if not labels:
+        return "No labels provided.", 400
 
     buf = BytesIO()
-    gerar_pdf(etiquetas, buf)
+    generate_pdf(labels, buf)
     buf.seek(0)
 
     return send_file(buf, mimetype="application/pdf",
-                     as_attachment=True, download_name="etiquetas.pdf")
+                     as_attachment=True, download_name="labels.pdf")
 
 
 if __name__ == "__main__":
