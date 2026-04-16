@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pdf
+*.txt
+!requirements.txt
+venv/
+.env

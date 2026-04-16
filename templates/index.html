@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etiquetas Pimaco</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 { font-size: 1.3rem; margin-bottom: 20px; }
+
+    #linhas { display: flex; flex-direction: column; gap: 10px; }
+
+    .linha {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .linha input[name="qty"] {
+      width: 90px;
+      min-width: 90px;
+      padding: 12px 8px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+      text-align: center;
+    }
+    .linha .sep {
+      font-size: 0.9rem;
+      color: #888;
+      white-space: nowrap;
+    }
+    .linha .val-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .linha .val-wrap .prefix {
+      padding: 12px 6px 12px 10px;
+      font-size: 1rem;
+      color: #555;
+      background: #f9f9f9;
+      border-right: 1px solid #ccc;
+      user-select: none;
+    }
+    .linha input[name="val"] {
+      flex: 1;
+      padding: 12px 8px;
+      border: none;
+      outline: none;
+      font-size: 1rem;
+      min-width: 0;
+    }
+    .linha button.remover {
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 1.4rem;
+      cursor: pointer;
+      padding: 4px 6px;
+      line-height: 1;
+    }
+    .linha button.remover:active { color: #e53935; }
+
+    button#adicionar {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      background: #f0f0f0;
+      color: #444;
+      border: 1px dashed #bbb;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    button#adicionar:active { background: #e0e0e0; }
+
+    button[type="submit"] {
+      margin-top: 16px;
+      width: 100%;
+      padding: 14px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button[type="submit"]:active { background: #1558b0; }
+
+    #resumo {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Etiquetas Pimaco A5Q-813</h1>
+
+    <form method="POST" action="/gerar">
+      <div id="linhas">
+        <div class="linha">
+          <input type="number" name="qty" min="1" max="999" placeholder="Qtd" value="1" required>
+          <span class="sep">×</span>
+          <div class="val-wrap">
+            <span class="prefix">R$</span>
+            <input type="number" name="val" min="1" max="999" placeholder="25" required>
+          </div>
+          <button type="button" class="remover" onclick="remover(this)">×</button>
+        </div>
+      </div>
+
+      <button type="button" id="adicionar" onclick="adicionarLinha()">+ Adicionar</button>
+
+      <div id="resumo">—</div>
+
+      <button type="submit">Gerar PDF</button>
+    </form>
+  </div>
+
+  <script>
+    function adicionarLinha() {
+      const container = document.getElementById('linhas');
+      const nova = document.createElement('div');
+      nova.className = 'linha';
+      nova.innerHTML = `
+        <input type="number" name="qty" min="1" max="999" placeholder="Qtd" value="1" required>
+        <span class="sep">×</span>
+        <div class="val-wrap">
+          <span class="prefix">R$</span>
+          <input type="number" name="val" min="1" max="999" placeholder="25" required>
+        </div>
+        <button type="button" class="remover" onclick="remover(this)">×</button>
+      `;
+      container.appendChild(nova);
+      nova.querySelector('input[name="val"]').focus();
+    }
+
+    function remover(btn) {
+      const linhas = document.querySelectorAll('.linha');
+      if (linhas.length > 1) {
+        btn.closest('.linha').remove();
+        atualizar();
+      }
+    }
+
+    const POR_PAGINA = 182;
+
+    function atualizar() {
+      const total = [...document.querySelectorAll('input[name="qty"]')]
+        .reduce((s, el) => s + (parseInt(el.value) || 0), 0);
+
+      const paginas = Math.ceil(total / POR_PAGINA) || 1;
+      const faltam  = paginas * POR_PAGINA - total;
+      const div     = document.getElementById('resumo');
+
+      if (total === 0) {
+        div.textContent = '—';
+        div.style.color = '#888';
+        return;
+      }
+
+      const faltamTxt = faltam === 0 ? 'folha completa' : `faltam ${faltam}`;
+      div.textContent = `${total} etiquetas · ${paginas} páginas · ${faltamTxt}`;
+      div.style.color = faltam === 0 ? '#2e7d32' : '#b8860b';
+    }
+
+    document.getElementById('linhas').addEventListener('input', atualizar);
+    atualizar();
+  </script>
+</body>
+</html>
