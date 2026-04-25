@@ -105,11 +105,112 @@
     }
     button[type="submit"]:active { background: #1558b0; }
 
+    #btn-imprimir {
+      margin-top: 8px;
+      width: 100%;
+      padding: 14px;
+      background: #2e7d32;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #btn-imprimir:active { background: #1b5e20; }
+    #btn-imprimir:disabled { opacity: 0.5; cursor: default; }
+
+    #status-print {
+      margin-top: 10px;
+      min-height: 1.2em;
+    }
+    #status-print.sucesso {
+      background: #f1f8f1;
+      border: 1px solid #a5d6a7;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    #status-print.sucesso .s-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #2e7d32;
+    }
+    #status-print.sucesso .s-detail {
+      font-size: 0.82rem;
+      color: #555;
+    }
+    #status-print.erro {
+      font-size: 0.85rem;
+      text-align: center;
+      color: #c62828;
+    }
     #resumo {
       margin-top: 14px;
       font-size: 0.85rem;
       color: #888;
     }
+
+    #modal-preview {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+    }
+    #modal-box {
+      position: relative;
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      width: min(90vw, 700px);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    #modal-box h2 {
+      font-size: 1rem;
+      color: #333;
+    }
+    #preview-frame {
+      width: 100%;
+      height: 60vh;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    #modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+    #modal-actions button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #btn-cancelar {
+      background: #c62828;
+      color: white;
+    }
+    #btn-cancelar:active { background: #8e0000; }
+    #btn-confirmar {
+      background: #2e7d32;
+      color: white;
+    }
+    #btn-confirmar:active { background: #1b5e20; }
+    #btn-confirmar:disabled { opacity: 0.5; cursor: default; }
   </style>
 </head>
 <body>
@@ -134,7 +235,22 @@
       <div id="resumo">—</div>
 
       <button type="submit">Gerar PDF</button>
+      <button type="button" id="btn-imprimir" onclick="abrirPreview()">Imprimir</button>
+      <div id="status-print"></div>
     </form>
+  </div>
+
+  <!-- Modal de preview -->
+  <div id="modal-preview">
+    <div id="modal-backdrop" onclick="fecharPreview()"></div>
+    <div id="modal-box">
+      <h2>Pré-visualização</h2>
+      <iframe id="preview-frame" src=""></iframe>
+      <div id="modal-actions">
+        <button id="btn-cancelar" onclick="fecharPreview()">Cancelar</button>
+        <button id="btn-confirmar" onclick="confirmarImpressao()">Confirmar impressão</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -186,6 +302,63 @@
 
     document.getElementById('linhas').addEventListener('input', atualizar);
     atualizar();
+
+    let _blobUrl = null;
+
+    async function abrirPreview() {
+      const status = document.getElementById('status-print');
+      status.className = '';
+      status.innerHTML = '';
+      const btn = document.getElementById('btn-imprimir');
+      btn.disabled = true;
+      try {
+        const resp = await fetch('/gerar', { method: 'POST', body: new FormData(document.querySelector('form')) });
+        if (!resp.ok) { alert('Erro ao gerar preview.'); return; }
+        _blobUrl = URL.createObjectURL(await resp.blob());
+        document.getElementById('preview-frame').src = _blobUrl;
+        document.getElementById('modal-preview').style.display = 'flex';
+      } catch {
+        alert('Erro ao gerar preview.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function fecharPreview() {
+      document.getElementById('modal-preview').style.display = 'none';
+      document.getElementById('preview-frame').src = '';
+      if (_blobUrl) { URL.revokeObjectURL(_blobUrl); _blobUrl = null; }
+    }
+
+    async function confirmarImpressao() {
+      const btnConfirmar = document.getElementById('btn-confirmar');
+      const status = document.getElementById('status-print');
+      btnConfirmar.disabled = true;
+      fecharPreview();
+      status.style.color = '#888';
+      status.textContent = 'Enviando para a impressora…';
+
+      try {
+        const resp = await fetch('/imprimir', { method: 'POST', body: new FormData(document.querySelector('form')) });
+        const data = await resp.json();
+        if (resp.ok) {
+          const paginas = Math.ceil(data.total / POR_PAGINA);
+          status.className = 'sucesso';
+          status.innerHTML = `
+            <span class="s-title">Impressão enviada com sucesso</span>
+            <span class="s-detail">${data.total} etiquetas · ${paginas} ${paginas === 1 ? 'página' : 'páginas'}</span>
+          `;
+        } else {
+          status.className = 'erro';
+          status.textContent = data.error || 'Erro ao imprimir.';
+        }
+      } catch {
+        status.className = 'erro';
+        status.textContent = 'Não foi possível conectar à impressora.';
+      } finally {
+        btnConfirmar.disabled = false;
+      }
+    }
   </script>
 </body>
 </html>
